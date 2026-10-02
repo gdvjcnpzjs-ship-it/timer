@@ -382,11 +382,10 @@
             document.getElementById('appleTouchIcon').href = iconUrl;
         })();
 
-        // 初期標準プリセット（ポモドーロを追加）
+        // 初期標準プリセット
         const DEFAULT_PRESETS = [
             { id: 'default-1', name: 'タバタ (4分)', prepare: 5, work: 20, rest: 10, rounds: 8 },
-            { id: 'default-2', name: '30秒/30秒 (4分)', prepare: 5, work: 30, rest: 30, rounds: 4 },
-            { id: 'default-3', name: 'ポモドーロ (25分/5分)', prepare: 5, work: 1500, rest: 300, rounds: 4 }
+            { id: 'default-2', name: '30秒/30秒 (4分)', prepare: 5, work: 30, rest: 30, rounds: 4 }
         ];
 
         // 状態変数
@@ -404,10 +403,6 @@
         let lastTimestamp = null;
         let animationFrameId = null;
         let wakeLock = null;
-
-        // ロック画面表示用の無音オーディオ
-        const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAAA');
-        silentAudio.loop = true;
 
         // UIエレメント
         const bodyEl = document.body;
@@ -467,32 +462,6 @@
             if (isMuted || !audioCtx) return;
             [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
                 setTimeout(() => playBeep(freq, 'triangle', 0.25), idx * 150);
-            });
-        }
-
-        // Lock Screen / Media Session 更新
-        function updateMediaSession() {
-            if ('mediaSession' in navigator && currentPreset) {
-                const timeStr = formatTime(Math.ceil(phaseTimeRemaining));
-                let phaseText = "準備";
-                if (currentPhase === 'WORK') phaseText = "作業/運動";
-                else if (currentPhase === 'REST') phaseText = "休憩";
-                else if (currentPhase === 'COMPLETE') phaseText = "完了！";
-
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: `${timeStr} (${phaseText})`,
-                    artist: currentPreset.name,
-                    album: `SET ${currentRound} / ${currentPreset.rounds}`
-                });
-            }
-        }
-
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.setActionHandler('play', () => {
-                if (!isRunning) toggleStartPause();
-            });
-            navigator.mediaSession.setActionHandler('pause', () => {
-                if (isRunning) toggleStartPause();
             });
         }
 
@@ -562,14 +531,12 @@
             bodyEl.className = `state-${currentPhase.toLowerCase()}`;
 
             if (currentPhase === 'PREPARE') phaseBadge.textContent = "準備";
-            else if (currentPhase === 'WORK') phaseBadge.textContent = "作業/運動";
-            else if (currentPhase === 'REST') phaseBadge.textContent = "休憩";
+            else if (currentPhase === 'WORK') phaseBadge.textContent = "運動 (WORK)";
+            else if (currentPhase === 'REST') phaseBadge.textContent = "休憩 (REST)";
             else if (currentPhase === 'COMPLETE') {
                 phaseBadge.textContent = "完了！";
                 timeDisplay.textContent = "00:00";
             }
-
-            updateMediaSession();
         }
 
         function tick(timestamp) {
@@ -610,7 +577,6 @@
                     startBtn.textContent = "スタート";
                     playCompleteBeep();
                     releaseWakeLock();
-                    silentAudio.pause();
                     return;
                 } else {
                     currentPhase = 'REST';
@@ -634,12 +600,10 @@
                 startBtn.textContent = "一時停止";
                 lastTimestamp = null;
                 requestWakeLock();
-                silentAudio.play().catch(() => {});
                 animationFrameId = requestAnimationFrame(tick);
             } else {
                 startBtn.textContent = "再開";
                 releaseWakeLock();
-                silentAudio.pause();
                 if (animationFrameId) cancelAnimationFrame(animationFrameId);
             }
         }
@@ -648,7 +612,6 @@
             isRunning = false;
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             releaseWakeLock();
-            silentAudio.pause();
 
             if (currentPreset) {
                 currentPhase = 'PREPARE';
@@ -673,12 +636,12 @@
                 inputRounds.value = currentPreset.rounds;
                 deletePresetBtn.style.display = presets.length > 1 ? 'block' : 'none';
             } else {
-                modalTitle.textContent = "新規設定作成";
-                inputName.value = "ポモドーロ 25分";
+                modalTitle.textContent = "新規トレーニング作成";
+                inputName.value = "カスタム 4分";
                 inputPrepare.value = 5;
-                inputWork.value = 1500;
-                inputRest.value = 300;
-                inputRounds.value = 4;
+                inputWork.value = 20;
+                inputRest.value = 10;
+                inputRounds.value = 8;
                 deletePresetBtn.style.display = 'none';
             }
             settingsModal.classList.add('open');
@@ -689,7 +652,7 @@
         }
 
         function savePresetFromModal() {
-            const name = inputName.value.trim() || '無題の設定';
+            const name = inputName.value.trim() || '無題のトレーニング';
             const prepare = Math.max(0, parseInt(inputPrepare.value) || 0);
             const work = Math.max(1, parseInt(inputWork.value) || 1);
             const rest = Math.max(0, parseInt(inputRest.value) || 0);
